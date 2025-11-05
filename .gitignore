@@ -1,2 +1,6 @@
 target
 Cargo.lock
+/proofs/fstar/extraction/.depend
+/proofs/fstar/extraction/Gcd.fst
+/proofs/fstar/extraction/hax.fst.config.json
+.fstar-cache

@@ -38,12 +38,15 @@ macro_rules! gcd_impl {
             if v == 0 { return u; }
 
             let shift = (u | v).trailing_zeros();
-            u >>= shift;
-            v >>= shift;
-            u >>= u.trailing_zeros();
+            // u >>= shift;
+            // v >>= shift;
+            // u >>= u.trailing_zeros();
+            
+            while v != u {
+                hax_lib::loop_decreases!(if v < u { u } else { v });
+                hax_lib::loop_invariant!(v != 0 && u != 0);
+                // v >>= v.trailing_zeros();
 
-            loop {
-                v >>= v.trailing_zeros();
 
                 #[allow(clippy::manual_swap)]
                 if u > v {
@@ -54,14 +57,13 @@ macro_rules! gcd_impl {
                 }
 
                 v -= u; // here v >= u
-
-                if v == 0 { break; }
             }
 
             u << shift
         }
 
         #[doc = concat!("Const euclid GCD implementation for `", stringify!($T), "`.")]
+        #[hax_lib::exclude()]
         pub const fn $euclid(a: $T, b: $T) -> $T
         {
             // variable names based off euclidean division equation: a = b · q + r
@@ -84,10 +86,11 @@ macro_rules! gcd_impl {
             a
         }
 
+        #[hax_lib::exclude()]
         impl Gcd for $T {
             #[inline]
             fn gcd(self, other: $T) -> $T {
-                self.gcd_binary(other)
+                $binary(self, other)
             }
 
             #[inline]
@@ -115,6 +118,7 @@ gcd_impl! {
 macro_rules! gcd_impl_nonzero {
     ($(($T:ty) $binary_nonzero:ident/$binary:ident $euclid_nonzero:ident/$euclid:ident),*) => {$(
         #[doc = concat!("Const binary GCD implementation for `", stringify!($T), "`.")]
+        #[hax_lib::exclude()]
         pub const fn $binary_nonzero(u: $T, v: $T) -> $T
         {
             match <$T>::new($binary(u.get(), v.get())) {
@@ -124,6 +128,7 @@ macro_rules! gcd_impl_nonzero {
         }
 
         #[doc = concat!("Const euclid GCD implementation for `", stringify!($T), "`.")]
+        #[hax_lib::exclude()]
         pub const fn $euclid_nonzero(a: $T, b: $T) -> $T
         {
             match <$T>::new($euclid(a.get(), b.get())) {
@@ -132,6 +137,7 @@ macro_rules! gcd_impl_nonzero {
             }
         }
 
+        #[hax_lib::exclude()]
         impl Gcd for $T {
             #[inline]
             fn gcd(self, other: $T) -> $T {
