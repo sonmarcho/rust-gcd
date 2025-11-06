@@ -38,14 +38,12 @@ macro_rules! gcd_impl {
             if v == 0 { return u; }
 
             let shift = (u | v).trailing_zeros();
-            // u >>= shift;
-            // v >>= shift;
-            // u >>= u.trailing_zeros();
-            
+            v >>= v.trailing_zeros();
+            u >>= u.trailing_zeros();
+
             while v != u {
                 hax_lib::loop_decreases!(if v < u { u } else { v });
                 hax_lib::loop_invariant!(v != 0 && u != 0);
-                // v >>= v.trailing_zeros();
 
 
                 #[allow(clippy::manual_swap)]
@@ -55,15 +53,15 @@ macro_rules! gcd_impl {
                     u = v;
                     v = temp;
                 }
-
-                v -= u; // here v >= u
+                // here v >= u
+                v -= u; 
+                v >>= v.trailing_zeros();
             }
 
             u << shift
         }
 
         #[doc = concat!("Const euclid GCD implementation for `", stringify!($T), "`.")]
-        #[hax_lib::exclude()]
         pub const fn $euclid(a: $T, b: $T) -> $T
         {
             // variable names based off euclidean division equation: a = b · q + r
@@ -75,6 +73,7 @@ macro_rules! gcd_impl {
 
             #[allow(clippy::manual_swap)]
             while b != 0 {
+                hax_lib::loop_decreases!(b);
                 // mem::swap(&mut a, &mut b);
                 let temp = a;
                 a = b;
