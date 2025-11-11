@@ -229,15 +229,32 @@ pub const fn $binary(mut u: $T, mut v: $T) -> $T
     u << shift
 }
 ```
-So how can we get rid of the `break`? We will have to modify the Rust code a little. 
-Considering the checks at the beginning of the function,
-it is easy to see that `u` and `v` cannot be zero at the beginning of the `while`-loop
-because the shifting operations before the while loop can only remove zeros.
-So we can replace the while loop by the following,
-without changing the function's behavior:
+So how can we get rid of the `break`? We will have to modify the Rust code a little.
+We will try to move the line `if v == 0 { break; }` further up.
+Since `v - u == 0` if and only if `u == v`, we can check for that
+before the assignment `v -= u`:
 ```rust
-while v != 0 {
+while true {
     v >>= v.trailing_zeros();
+
+    if u > v {
+        let temp = u;
+        u = v;
+        v = temp;
+    }
+
+    if u == v { break; }
+
+    v -= u;
+}
+```
+Moreover, for the condition `u == v` it does not matter
+whether `u` and `v` are swapped. So we can also move the check before the swapping:
+```rust
+while true {
+    v >>= v.trailing_zeros();
+
+    if u == v { break; }
 
     if u > v {
         let temp = u;
@@ -248,19 +265,13 @@ while v != 0 {
     v -= u;
 }
 ```
-The only difference is that we now perform one additional check `v != 0` before the first iteration of the while-loop, and this check will always yield `true`.
-
-Now, instead of looking at the next error that the next verification attempt would yield,
-let us first think about, which termination measure we can assign to this while-loop.
-
-Here is a summary of what the while loop is doing: The first line of the loop removes any trailing zeros in the binary representation of `v`. We don't need to this for `u` because `u` will never have any trailing zeros at this point. And then, we subtract the smaller number among `u` and `v` from the larger one among them. So in each iteration, one of the two numbers will definitely get smaller, and the other one will get smaller or remain the same.
-
-Unfortunately, the `loop_decreases` annotation is limited to take only machine integers. So we cannot
-use the pair `(u, v)` as a termination measure and we cannot use `u + v` as a termination measure because `u + v` might cause integer overflow. Instead, we will use the larger number among `u` and `v` as our termination measure:
+Since the loop-condition is always true, we can do the
+assignment `v >>= v.trailing_zeros();` just as well at the end of every iteration instead of the beginning of each iteration
+if we perform it one additional time before the loop starts:
 ```rust
-while v != 0 {
-    hax_lib::loop_decreases!(if v < u { u } else { v });
-    v >>= v.trailing_zeros();
+v >>= v.trailing_zeros();
+while true {
+    if u == v { break; }
 
     if u > v {
         let temp = u;
@@ -269,15 +280,13 @@ while v != 0 {
     }
 
     v -= u;
+    v >>= v.trailing_zeros();
 }
 ```
-This is almost correct, but not quite. In the edge case where `u` and `v` are equal at the beginning of the loop, `v` is set to `0`, but `u` remains the same. So in this edge case, the expression `if v < u { u } else { v }` does not decrease.
-
-However, noting that this edge case will always be the last iteration of the loop because `v` is set to `0`, we can refactor the code to make the termination measure work:
+Finally, we can move the line `if u == v { break; }` into the loop's condition:
 ```rust
-while v != 0 {
-    hax_lib::loop_decreases!(if v < u { u } else { v });
-    v >>= v.trailing_zeros();
+v >>= v.trailing_zeros();
+while u != v {
 
     if u > v {
         let temp = u;
@@ -286,5 +295,90 @@ while v != 0 {
     }
 
     v -= u;
+    v >>= v.trailing_zeros();
+}
+```
+Extracting and running F* now yields:
+```
+* Error 19 at Gcd.fst(15,23-15,28):
+  - Subtyping check failed
+  - Expected type
+      b:
+      Rust_primitives.Integers.int_t Rust_primitives.Integers.U32
+        { Rust_primitives.Integers.v b >= 0 /\
+          Rust_primitives.Integers.v b <
+          Rust_primitives.Integers.bits Rust_primitives.Integers.U8 }
+    got type Rust_primitives.Integers.u32
+```
+This error occurs because the F* specification of the `>>`-function expects its right-hand argument to be smaller than the total number of bits of the employed integer type. This is already the case in our code, but F* is not able to figure out that the value `shift` is indeed small enough.
+
+To simplify things, we can first remove the lines `u >>= shift;`
+and `v >>= shift;`, which are in fact useless because
+we shift `u` by  `u.trailing_zeros()` and `v` by `v.trailing_zeros()` afterwards anyway.
+
+Now, all right-shifts in our code are by the number of trailing zeros of the given integer. That number of zeros can in principle be equal to the number of bits of the integer (which would be to large for `>>`), but only if the integer is `0`. So we can help F* to figure out that everything is okay by adding the following lemma to `Core_models.Num.fsti`:
+```
+val trailing_zeros_lt_bits #t (a: int_t t):
+    Lemma (requires (v a <> 0))
+          (ensures (v (trailing_zeros a) < bits t))
+          [SMTPat (trailing_zeros a)]
+```
+The lemma states that the number of trailing zeros is smaller than the total number of bits whenever the integer is nonzero.
+The `SMTPat`-annotation tells F* that this lemma should be considered whenever a problem contains the `trailing_zeros` function.
+
+This resolves the error around `>>`. The next error we get is:
+```
+* Error 19 at Gcd.fst(41,14-41,18):
+  - Subtyping check failed
+  - Expected type
+      o:
+      (Rust_primitives.Integers.u8 & Rust_primitives.Integers.u8)
+        { (let _, _ = o in
+            true) /\
+          (let _, _ = o in
+            Rust_primitives.Hax.Int.from_machine (Rust_primitives.Integers.mk_u32
+                  0)
+            <:
+            Hax_lib.Int.t_Int) <
+          (let _, _ = temp_0_ in
+            Rust_primitives.Hax.Int.from_machine (Rust_primitives.Integers.mk_u32
+                  0)
+            <:
+            Hax_lib.Int.t_Int) }
+    got type Rust_primitives.Integers.u8 & Rust_primitives.Integers.u8
+```
+We have seen this error before for the euclidean algorithm.
+It means that we have forgotten to annotate the while loop with
+a measure to prove termination. Let us first think about which termination measure we can assign to this while-loop:
+```
+while u != v {
+
+    if u > v {
+        let temp = u;
+        u = v;
+        v = temp;
+    }
+
+    v -= u;
+    v >>= v.trailing_zeros();
+}
+```
+
+Here is a summary of what the while loop is doing: It subtracts the smaller number among `u` and `v` from the larger one among them.
+Then, it removes any trailing zeros from the result.
+So in each iteration, the larger one of the two numbers will definitely get smaller, and the other one will remain the same.
+Therefore, we will use the larger number among `u` and `v` as our termination measure:
+```rust
+while u != v {
+    hax_lib::loop_decreases!(if v < u { u } else { v });
+
+    if u > v {
+        let temp = u;
+        u = v;
+        v = temp;
+    }
+
+    v -= u;
+    v >>= v.trailing_zeros();
 }
 ```
