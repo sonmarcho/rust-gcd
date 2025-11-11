@@ -33,3 +33,8 @@ val shift_right_trailing_zeros_le #t (a: int_t t):
     Lemma (requires (v a <> 0))
           (ensures (v (shift_right a (trailing_zeros a)) <= v a))
           [SMTPat (shift_right a (trailing_zeros a))]
+
+val modulo_lemma #t (a b x: int_t t) :
+    Lemma (requires (v x <> 0 && v a <> 0 && v (a %! x) = 0))
+          (ensures ((b %! a) %! x == b %! x))
+          [SMTPat ((b %! a) %! x)]

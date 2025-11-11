@@ -33,7 +33,7 @@ macro_rules! gcd_impl {
     ($(($T:ty) $binary:ident $euclid:ident),*) => {$(
         #[doc = concat!("Const binary GCD implementation for `", stringify!($T), "`.")]
         #[hax_lib::include]
-        pub const fn $binary(mut u: $T, mut v: $T) -> $T
+        pub fn $binary(mut u: $T, mut v: $T) -> $T
         {
             if u == 0 { return v; }
             if v == 0 { return u; }
@@ -64,9 +64,14 @@ macro_rules! gcd_impl {
         #[doc = concat!("Const euclid GCD implementation for `", stringify!($T), "`.")]
         #[hax_lib::include]
         #[hax_lib::requires(a != 0 || b != 0)]
-        // #[hax_lib::ensures(|res| res != 0 && a % res == 0)] // a % res == 0 && b % res == 0
-        pub const fn $euclid(a: $T, b: $T) -> $T
+        #[hax_lib::ensures(|res|
+            res == 0 || (a % res == 0 && b % res == 0)
+        )]
+        pub fn $euclid(a: $T, b: $T) -> $T
         {
+            let a0 = a;
+            let b0 = b;
+
             // variable names based off euclidean division equation: a = b · q + r
             let (mut a, mut b) = if a > b {
                 (a, b)
@@ -77,7 +82,12 @@ macro_rules! gcd_impl {
             #[allow(clippy::manual_swap)]
             while b != 0 {
                 hax_lib::loop_decreases!(b);
-                // hax_lib::loop_invariant!(a != 0);
+                hax_lib::loop_invariant!(
+                    hax_lib::forall(|x: $T|
+                        !(x != 0 && a % x == 0 && b % x == 0) ||
+                        (a0 % x == 0 && b0 % x == 0)
+                    )
+                );
                 // mem::swap(&mut a, &mut b);
                 let temp = a;
                 a = b;
@@ -85,6 +95,9 @@ macro_rules! gcd_impl {
 
                 b %= a;
             }
+
+            hax_lib::assert!(a == 0 || a0 % a == 0);
+            hax_lib::assert!(a == 0 || b0 % a == 0);
 
             a
         }
@@ -109,18 +122,18 @@ macro_rules! gcd_impl {
 }
 
 gcd_impl! {
-    (u8) binary_u8 euclid_u8,
-    (u16) binary_u16 euclid_u16,
-    (u32) binary_u32 euclid_u32,
-    (u64) binary_u64 euclid_u64,
-    (u128) binary_u128 euclid_u128,
-    (usize) binary_usize euclid_usize
+    (u8) binary_u8 euclid_u8//,
+    // (u16) binary_u16 euclid_u16,
+    // (u32) binary_u32 euclid_u32,
+    // (u64) binary_u64 euclid_u64,
+    // (u128) binary_u128 euclid_u128,
+    // (usize) binary_usize euclid_usize
 }
 
 macro_rules! gcd_impl_nonzero {
     ($(($T:ty) $binary_nonzero:ident/$binary:ident $euclid_nonzero:ident/$euclid:ident),*) => {$(
         #[doc = concat!("Const binary GCD implementation for `", stringify!($T), "`.")]
-        pub const fn $binary_nonzero(u: $T, v: $T) -> $T
+        pub fn $binary_nonzero(u: $T, v: $T) -> $T
         {
             match <$T>::new($binary(u.get(), v.get())) {
                 Some(x) => x,
@@ -129,7 +142,7 @@ macro_rules! gcd_impl_nonzero {
         }
 
         #[doc = concat!("Const euclid GCD implementation for `", stringify!($T), "`.")]
-        pub const fn $euclid_nonzero(a: $T, b: $T) -> $T
+        pub fn $euclid_nonzero(a: $T, b: $T) -> $T
         {
             match <$T>::new($euclid(a.get(), b.get())) {
                 Some(x) => x,
@@ -156,14 +169,14 @@ macro_rules! gcd_impl_nonzero {
     )*}
 }
 
-gcd_impl_nonzero! {
-    (NonZeroU8) binary_nonzero_u8/binary_u8 euclid_nonzero_u8/euclid_u8,
-    (NonZeroU16) binary_nonzero_u16/binary_u16 euclid_nonzero_u16/euclid_u16,
-    (NonZeroU32) binary_nonzero_u32/binary_u32 euclid_nonzero_u32/euclid_u32,
-    (NonZeroU64) binary_nonzero_u64/binary_u64 euclid_nonzero_u64/euclid_u64,
-    (NonZeroU128) binary_nonzero_u128/binary_u128 euclid_nonzero_u128/euclid_u128,
-    (NonZeroUsize) binary_nonzero_usize/binary_usize euclid_nonzero_usize/euclid_usize
-}
+// gcd_impl_nonzero! {
+//     (NonZeroU8) binary_nonzero_u8/binary_u8 euclid_nonzero_u8/euclid_u8,
+//     (NonZeroU16) binary_nonzero_u16/binary_u16 euclid_nonzero_u16/euclid_u16,
+//     (NonZeroU32) binary_nonzero_u32/binary_u32 euclid_nonzero_u32/euclid_u32,
+//     (NonZeroU64) binary_nonzero_u64/binary_u64 euclid_nonzero_u64/euclid_u64,
+//     (NonZeroU128) binary_nonzero_u128/binary_u128 euclid_nonzero_u128/euclid_u128,
+//     (NonZeroUsize) binary_nonzero_usize/binary_usize euclid_nonzero_usize/euclid_usize
+// }
 
 #[cfg(test)]
 mod test {
