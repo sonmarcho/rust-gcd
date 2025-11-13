@@ -15,4 +15,4 @@ gcd.llbc: $(wildcard */*.rs)
 
 .PHONY: clean
 clean:
-	rm gcd.llbc
+	rm -f gcd.llbc
