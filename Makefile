@@ -12,3 +12,7 @@ extract: gcd.llbc
 
 gcd.llbc: $(wildcard */*.rs)
 	RUSTFLAGS="--cfg eurydice" $(CHARON_EXE) cargo --preset=aeneas --start-from crate::euclid_u8,crate::binary_u8
+
+.PHONY: clean
+clean:
+	rm gcd.llbc
