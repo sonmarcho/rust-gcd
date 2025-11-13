@@ -11,4 +11,4 @@ extract: gcd.llbc
 	$(AENEAS_EXE) -backend lean gcd.llbc -split-files -dest lean $(AENEAS_OPTIONS)
 
 gcd.llbc: $(wildcard */*.rs)
-	RUSTFLAGS="--cfg eurydice" $(CHARON_EXE) cargo --preset=aeneas --start-from crate::euclid_u8,crate::binary_u8
+	RUSTFLAGS="--cfg eurydice" $(CHARON_EXE) cargo --preset=aeneas

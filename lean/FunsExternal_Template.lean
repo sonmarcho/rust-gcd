@@ -10,7 +10,7 @@ set_option linter.unusedVariables false
 open gcd
 
 /- [core::num::{u8}::trailing_zeros]:
-   Source: '/rustc/library/core/src/num/uint_macros.rs', lines 149:8-149:48
+   Source: '/rustc/library/core/src/num/uint_macros.rs', lines 152:8-152:48
    Name pattern: [core::num::{u8}::trailing_zeros] -/
 axiom core.num.U8.trailing_zeros : U8 → Result U32
 
